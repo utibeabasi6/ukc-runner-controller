@@ -1,0 +1,134 @@
+package web
+
+import (
+	"net/url"
+	"strconv"
+	"time"
+)
+
+templ jobsPage(v jobsView) {
+	<div class="page-title">
+		@eyebrow("", "Jobs") {
+			{ strconv.Itoa(len(v.Jobs)) } shown
+		}
+		<h1>Jobs</h1>
+	</div>
+	<nav class="filters" aria-label="Scale set">
+		@filterLink(jobsURL("", v.Filter.Status), "all scale sets", v.Filter.ScaleSet == "")
+		for _, name := range v.ScaleSets {
+			@filterLink(jobsURL(name, v.Filter.Status), name, v.Filter.ScaleSet == name)
+		}
+	</nav>
+	<nav class="filters" aria-label="Status">
+		@filterLink(jobsURL(v.Filter.ScaleSet, ""), "any status", v.Filter.Status == "")
+		for _, st := range jobStatuses {
+			@filterLink(jobsURL(v.Filter.ScaleSet, st), st, v.Filter.Status == st)
+		}
+	</nav>
+	@jobsTable(v.Jobs, "No jobs match these filters.")
+}
+
+templ filterLink(href, label string, current bool) {
+	<a
+		class="badge"
+		href={ templ.SafeURL(href) }
+		if current {
+			aria-current="true"
+		}
+	>{ label }</a>
+}
+
+func jobsURL(scaleSet, status string) string {
+	q := url.Values{}
+	if scaleSet != "" {
+		q.Set("scale_set", scaleSet)
+	}
+	if status != "" {
+		q.Set("status", status)
+	}
+	if len(q) == 0 {
+		return "/jobs"
+	}
+	return "/jobs?" + q.Encode()
+}
+
+templ jobPage(v jobView) {
+	<div class="page-title">
+		@eyebrow("", "Job "+strconv.FormatInt(v.Job.RequestID, 10)) {
+			@badge(jobTone(v.Job.Status()), v.Job.Status())
+		}
+		<h1>
+			if v.Job.DisplayName != "" {
+				{ v.Job.DisplayName }
+			} else {
+				Request { strconv.FormatInt(v.Job.RequestID, 10) }
+			}
+		</h1>
+		<div class="meta">
+			<span>{ v.Job.Owner }/{ v.Job.Repository }</span>
+			<span>{ workflowFile(v.Job.WorkflowRef) }</span>
+			if v.Job.EventName != "" {
+				<span>{ v.Job.EventName }</span>
+			}
+			if v.RunURL != "" {
+				<a href={ templ.SafeURL(v.RunURL) } rel="noreferrer">view run on GitHub →</a>
+			}
+		</div>
+	</div>
+	<div class="split">
+		<section class="card">
+			@eyebrow("", "Details") {
+			}
+			<dl class="facts">
+				<dt>Scale set</dt>
+				<dd>{ v.Job.ScaleSet }</dd>
+				<dt>Runner</dt>
+				<dd>
+					if v.Job.RunnerName != "" {
+						<a href={ templ.SafeURL("/runners/" + v.Job.RunnerName) }>{ v.Job.RunnerName }</a>
+					} else {
+						<span class="faint">not assigned</span>
+					}
+				</dd>
+				<dt>Workflow</dt>
+				<dd>{ v.Job.WorkflowRef }</dd>
+				<dt>Job ID</dt>
+				<dd>{ v.Job.JobID }</dd>
+				<dt>Result</dt>
+				<dd>
+					if v.Job.Result != "" {
+						{ v.Job.Result }
+					} else {
+						<span class="faint">pending</span>
+					}
+				</dd>
+			</dl>
+		</section>
+		<section class="card">
+			@eyebrow("", "Timeline") {
+			}
+			<dl class="facts">
+				<dt>Queued</dt>
+				<dd>{ clock(v.Job.QueuedAt) }</dd>
+				@timelineStep("Assigned", v.Job.QueuedAt, v.Job.AssignedAt)
+				@timelineStep("Started", v.Job.QueuedAt, v.Job.StartedAt)
+				@timelineStep("Completed", v.Job.QueuedAt, v.Job.CompletedAt)
+				<dt>Wait</dt>
+				<dd>{ duration(v.Job.Wait()) }</dd>
+				<dt>Duration</dt>
+				<dd>{ duration(v.Job.Duration()) }</dd>
+			</dl>
+		</section>
+	</div>
+}
+
+templ timelineStep(label string, from time.Time, at *time.Time) {
+	<dt>{ label }</dt>
+	<dd>
+		if at == nil {
+			<span class="faint">—</span>
+		} else {
+			{ clock(*at) } <span class="muted">+{ duration(at.Sub(from)) }</span>
+		}
+	</dd>
+}

@@ -1,0 +1,10 @@
+.git
+.github
+bin
+dist
+image
+*.db
+*.db-shm
+*.db-wal
+*.pem
+config.yaml

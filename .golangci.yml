@@ -1,0 +1,51 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - errorlint
+    - gosec
+    - misspell
+    - noctx
+    - revive
+    - sloglint
+    - unconvert
+    - usestdlibvars
+  settings:
+    gosec:
+      excludes:
+        - G104
+        - G115
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+    sloglint:
+      kv-only: true
+      key-naming-case: snake
+  exclusions:
+    presets:
+      - comments
+      - std-error-handling
+      - common-false-positives
+    rules:
+      - path: _test\.go$
+        linters:
+          - errcheck
+      - path: internal/store/
+        text: G202
+    paths:
+      - _templ\.go$
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/utibeabasi6/ukc-runner-controller
+  exclusions:
+    paths:
+      - _templ\.go$

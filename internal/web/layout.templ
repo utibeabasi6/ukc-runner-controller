@@ -1,0 +1,104 @@
+package web
+
+import "time"
+
+templ layout(title, nav, version string, content templ.Component) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<meta name="theme-color" content="#fcfcfd"/>
+			<title>{ title } · ukc-runner-controller</title>
+			<link rel="stylesheet" href={ asset("css/tokens.css") }/>
+			<link rel="stylesheet" href={ asset("css/app.css") }/>
+			<script src={ asset("js/refresh.js") } defer></script>
+		</head>
+		<body>
+			<header class="topbar">
+				<div class="container">
+					<a class="wordmark" href="/">ukc-runner-controller</a>
+					<nav class="nav" aria-label="Main">
+						@navLink("/", "Overview", nav == navOverview)
+						@navLink("/jobs", "Jobs", nav == navJobs)
+						@navLink("/runners", "Runners", nav == navRunners)
+						@navLink("/scale-sets", "Scale Sets", nav == navScaleSets)
+					</nav>
+				</div>
+			</header>
+			<main class="container" data-refresh="5000">
+				@content
+			</main>
+			<footer>
+				<div class="container mono">ukc-runner-controller { version }</div>
+			</footer>
+		</body>
+	</html>
+}
+
+templ navLink(href, label string, current bool) {
+	<a
+		href={ templ.SafeURL(href) }
+		if current {
+			aria-current="page"
+		}
+	>{ label }</a>
+}
+
+templ errorPage(code, message string) {
+	<div class="page-title">
+		@eyebrow(code, "Error") {
+		}
+		<h1>{ message }</h1>
+		<p><a href="/">Back to the overview →</a></p>
+	</div>
+}
+
+templ eyebrow(index, label string) {
+	<div class="eyebrow">
+		<span class="eyebrow-label">
+			if index != "" {
+				<span>[{ index }]</span>
+			}
+			<span>{ label }</span>
+		</span>
+		<span class="eyebrow-counter">
+			{ children... }
+		</span>
+	</div>
+}
+
+templ badge(tone, text string) {
+	<span class={ "badge", templ.KV("badge-"+tone, tone != "") }>{ text }</span>
+}
+
+templ timeAgo(t time.Time) {
+	<time datetime={ t.UTC().Format(time.RFC3339) } title={ clock(t) }>{ ago(t) }</time>
+}
+
+templ maybeTimeAgo(t *time.Time) {
+	if t == nil {
+		<span class="faint">—</span>
+	} else {
+		@timeAgo(*t)
+	}
+}
+
+templ terminal(title string, live bool, body string) {
+	<div class="terminal">
+		<div class="terminal-bar">
+			<span class="terminal-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+			<span class="terminal-title">{ title }</span>
+			if live {
+				<span class="terminal-status">live</span>
+			}
+		</div>
+		<pre>
+			if body == "" {
+				<span class="faint">no output</span>
+			} else {
+				{ body }
+			}
+		</pre>
+	</div>
+}

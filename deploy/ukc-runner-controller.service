@@ -1,0 +1,22 @@
+[Unit]
+Description=GitHub Actions runners on Unikraft Cloud
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=ukc-runner-controller
+Group=ukc-runner-controller
+EnvironmentFile=/etc/ukc-runner-controller/env
+ExecStart=/usr/local/bin/ukc-runner-controller run \
+  --config /etc/ukc-runner-controller/config.yaml \
+  --database /var/lib/ukc-runner-controller/ukc-runner-controller.db
+StateDirectory=ukc-runner-controller
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

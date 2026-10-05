@@ -1,0 +1,51 @@
+version: 2
+
+project_name: ukc-runner-controller
+
+builds:
+  - id: ukc-runner-controller
+    main: ./cmd/ukc-runner-controller
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/utibeabasi6/ukc-runner-controller/internal/cmd.version={{ .Version }}
+      - -X github.com/utibeabasi6/ukc-runner-controller/internal/cmd.commit={{ .FullCommit }}
+
+archives:
+  - formats: [tar.gz]
+    files:
+      - LICENSE
+      - README.md
+      - deploy/config.example.yaml
+
+checksum:
+  name_template: checksums.txt
+
+kos:
+  - build: ukc-runner-controller
+    repositories:
+      - ghcr.io/utibeabasi6/ukc-runner-controller
+    base_image: cgr.dev/chainguard/static
+    bare: true
+    preserve_import_paths: false
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    tags:
+      - "{{ .Version }}"
+      - latest
+    labels:
+      org.opencontainers.image.source: https://github.com/utibeabasi6/ukc-runner-controller
+      org.opencontainers.image.licenses: MIT
+
+changelog:
+  use: github

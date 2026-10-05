@@ -1,0 +1,174 @@
+package web
+
+import (
+	"strconv"
+
+	"github.com/utibeabasi6/ukc-runner-controller/internal/store"
+)
+
+templ runnersPage(v runnersView) {
+	<div class="page-title">
+		@eyebrow("", "Runners") {
+			{ strconv.Itoa(len(v.Active)) } active
+		}
+		<h1>Runners</h1>
+	</div>
+	<section class="section">
+		@eyebrow("01", "Active") {
+		}
+		@runnersTable(v.Active, "No runners are running.")
+	</section>
+	<section class="section">
+		@eyebrow("02", "Recent") {
+			last { strconv.Itoa(len(v.Recent)) }
+		}
+		@runnersTable(v.Recent, "No runner has finished yet.")
+	</section>
+}
+
+templ runnersTable(runners []store.Runner, empty string) {
+	<div class="table-wrap">
+		if len(runners) == 0 {
+			<p class="empty">{ empty }</p>
+		} else {
+			<table>
+				<thead>
+					<tr>
+						<th>State</th>
+						<th>Runner</th>
+						<th>Scale set</th>
+						<th>Created</th>
+						<th>Job started</th>
+						<th class="num">Boot</th>
+						<th class="num">Exit</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, r := range runners {
+						<tr>
+							<td>
+								@badge(runnerTone(r.State), string(r.State))
+							</td>
+							<td class="primary">
+								<a href={ templ.SafeURL("/runners/" + r.Name) }>{ r.Name }</a>
+								<span class="sub">{ shape(r.VCPUs, r.MemoryMB, r.DiskMB) }</span>
+							</td>
+							<td>{ r.ScaleSet }</td>
+							<td>
+								@timeAgo(r.CreatedAt)
+							</td>
+							<td>
+								@maybeTimeAgo(r.JobStartedAt)
+							</td>
+							<td class="num">
+								if r.BootTimeMS != nil {
+									{ strconv.Itoa(*r.BootTimeMS) }ms
+								} else {
+									<span class="faint">—</span>
+								}
+							</td>
+							<td class="num">
+								if r.ExitCode != nil {
+									{ strconv.Itoa(*r.ExitCode) }
+								} else {
+									<span class="faint">—</span>
+								}
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		}
+	</div>
+}
+
+templ runnerPage(v runnerView) {
+	<div class="page-title">
+		@eyebrow("", "Runner") {
+			@badge(runnerTone(v.Runner.State), string(v.Runner.State))
+		}
+		<h1 class="mono">{ v.Runner.Name }</h1>
+		<div class="meta">
+			<span>{ v.Runner.ScaleSet }</span>
+			<span>{ shape(v.Runner.VCPUs, v.Runner.MemoryMB, v.Runner.DiskMB) }</span>
+			<span>{ v.Runner.Image }</span>
+		</div>
+	</div>
+	if v.Runner.Error != "" {
+		<p class="callout section">
+			<span class="callout-label">Failure</span>
+			{ v.Runner.Error }
+		</p>
+	}
+	<div class="split section">
+		<section class="card">
+			@eyebrow("", "Instance") {
+			}
+			<dl class="facts">
+				<dt>UUID</dt>
+				<dd>
+					if v.Runner.InstanceUUID != "" {
+						{ v.Runner.InstanceUUID }
+					} else {
+						<span class="faint">not created</span>
+					}
+				</dd>
+				<dt>GitHub ID</dt>
+				<dd>{ strconv.Itoa(v.Runner.GitHubRunnerID) }</dd>
+				<dt>Created</dt>
+				<dd>{ clock(v.Runner.CreatedAt) }</dd>
+				<dt>Job started</dt>
+				<dd>
+					@maybeTimeAgo(v.Runner.JobStartedAt)
+				</dd>
+				<dt>Finished</dt>
+				<dd>
+					@maybeTimeAgo(v.Runner.FinishedAt)
+				</dd>
+				<dt>Deleted</dt>
+				<dd>
+					@maybeTimeAgo(v.Runner.InstanceDeletedAt)
+				</dd>
+				<dt>Boot time</dt>
+				<dd>
+					if v.Runner.BootTimeMS != nil {
+						{ strconv.Itoa(*v.Runner.BootTimeMS) }ms
+					} else {
+						<span class="faint">—</span>
+					}
+				</dd>
+				<dt>Exit code</dt>
+				<dd>
+					if v.Runner.ExitCode != nil {
+						{ strconv.Itoa(*v.Runner.ExitCode) }
+					} else {
+						<span class="faint">—</span>
+					}
+				</dd>
+				<dt>Stop reason</dt>
+				<dd>
+					if v.Runner.StopReason != "" {
+						{ v.Runner.StopReason }
+					} else {
+						<span class="faint">—</span>
+					}
+				</dd>
+			</dl>
+		</section>
+		<section>
+			@eyebrow("", "Jobs") {
+			}
+			@jobsTable(v.Jobs, "This runner has not taken a job.")
+		</section>
+	</div>
+	<section class="section">
+		@eyebrow("", "Console") {
+			if v.Live {
+				live tail
+			} else {
+				saved at deletion
+			}
+		}
+		@terminal(v.Runner.Name, v.Live, v.Logs)
+	</section>
+}

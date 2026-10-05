@@ -1,0 +1,41 @@
+FROM debian:13-slim
+
+ARG RUNNER_VERSION=2.337.0
+ARG RUNNER_SHA256=70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d0063816613
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      bzip2 \
+      ca-certificates \
+      curl \
+      git \
+      gnupg \
+      jq \
+      lsb-release \
+      openssh-client \
+      sudo \
+      unzip \
+      xz-utils \
+      zip \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --gid 1001 runner \
+ && useradd --uid 1001 --gid runner --create-home --shell /bin/bash runner \
+ && echo "runner ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/runner \
+ && chmod 0440 /etc/sudoers.d/runner
+
+WORKDIR /home/runner
+
+RUN curl -fsSL -o runner.tar.gz \
+      "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz" \
+ && echo "${RUNNER_SHA256}  runner.tar.gz" | sha256sum -c - \
+ && tar xzf runner.tar.gz \
+ && rm runner.tar.gz \
+ && ./bin/installdependencies.sh \
+ && rm -rf /var/lib/apt/lists/* \
+ && mkdir _work \
+ && chown -R runner:runner /home/runner
+
+COPY --chmod=0755 entrypoint.sh /usr/local/bin/entrypoint.sh

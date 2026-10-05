@@ -1,0 +1,29 @@
+github:
+  # An organization (https://github.com/acme), a repository
+  # (https://github.com/acme/app) or an enterprise
+  # (https://github.com/enterprises/acme).
+  url: https://github.com/acme
+  runner_group: default
+  app:
+    client_id: Iv23liExampleClientID
+    installation_id: 12345678
+    private_key_file: /etc/ukc-runner-controller/github-app.pem
+
+unikraft:
+  metro: fra
+
+runners:
+  - name: ukc-small
+    image: acme/actions-runner:2.337.0
+    vcpus: 1
+    memory_mb: 4096
+    disk_mb: 10240
+    max_runners: 10
+
+  - name: ukc-large
+    labels: [linux, x64]
+    image: acme/actions-runner:2.337.0
+    vcpus: 4
+    memory_mb: 8192
+    disk_mb: 20480
+    max_runners: 4

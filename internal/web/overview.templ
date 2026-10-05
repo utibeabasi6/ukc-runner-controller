@@ -1,0 +1,162 @@
+package web
+
+import (
+	"strconv"
+
+	"github.com/utibeabasi6/ukc-runner-controller/internal/store"
+)
+
+templ overviewPage(v overviewView) {
+	<section class="section">
+		@eyebrow("01", "Capacity") {
+			updated { v.Updated.UTC().Format("15:04:05") } UTC
+		}
+		<div class="card card-checker">
+			<div class="stats">
+				@stat("Active runners", strconv.Itoa(v.Queued+v.Idle+v.Busy), strconv.Itoa(v.Busy)+" busy · "+strconv.Itoa(v.Idle)+" idle · "+strconv.Itoa(v.Queued)+" queued")
+				@stat("Assigned jobs", strconv.Itoa(v.Assigned), "reported by GitHub")
+				@stat("Median wait", duration(v.Summary.MedianWait), "queue → start · last 24h")
+			</div>
+		</div>
+	</section>
+	<section class="section">
+		@eyebrow("02", "Scale Sets") {
+			<a href="/scale-sets">details →</a>
+		}
+		<div class="grid">
+			for _, ss := range v.ScaleSets {
+				@scaleSetCard(ss)
+			}
+		</div>
+	</section>
+	<section class="section">
+		@eyebrow("03", "Recent Jobs") {
+			<a href="/jobs">all jobs →</a>
+		}
+		@jobsTable(v.Jobs, "No jobs yet. Target a scale set with runs-on to send one here.")
+	</section>
+	<section class="section">
+		@eyebrow("04", "Events") {
+			last { strconv.Itoa(len(v.Events)) }
+		}
+		<div class="card">
+			@eventsList(v.Events)
+		</div>
+	</section>
+}
+
+templ stat(label, value, caption string) {
+	<div class="stat">
+		<div class="stat-label">{ label }</div>
+		<div class="stat-value">{ value }</div>
+		<div class="stat-caption">{ caption }</div>
+	</div>
+}
+
+templ scaleSetCard(v scaleSetView) {
+	<div class="card">
+		<div class="card-head">
+			<h2>{ v.Config.Name }</h2>
+			@badge(listenerTone(v.Status.State), v.Status.State)
+		</div>
+		<dl class="facts">
+			<dt>Runners</dt>
+			<dd>
+				{ strconv.Itoa(v.Queued + v.Idle + v.Busy) } / { strconv.Itoa(v.Config.MaxRunners) } · { strconv.Itoa(v.Busy) } busy
+				if v.Queued > 0 {
+					· { strconv.Itoa(v.Queued) } queued
+				}
+			</dd>
+			<dt>Shape</dt>
+			<dd>{ shape(v.Config.VCPUs, v.Config.MemoryMB, v.Config.DiskMB) }</dd>
+			<dt>Labels</dt>
+			<dd>
+				<span class="badges">
+					for _, l := range v.Config.Labels {
+						@badge("", l)
+					}
+				</span>
+			</dd>
+			<dt>Last poll</dt>
+			<dd>{ ago(v.Status.LastPollAt) }</dd>
+		</dl>
+		if v.Status.Error != "" {
+			<p class="callout">
+				<span class="callout-label">Listener error · { ago(v.Status.ErrorAt) }</span>
+				{ v.Status.Error }
+			</p>
+		}
+	</div>
+}
+
+templ jobsTable(jobs []store.Job, empty string) {
+	<div class="table-wrap">
+		if len(jobs) == 0 {
+			<p class="empty">{ empty }</p>
+		} else {
+			<table>
+				<thead>
+					<tr>
+						<th>Status</th>
+						<th>Job</th>
+						<th>Scale set</th>
+						<th>Runner</th>
+						<th>Queued</th>
+						<th class="num">Wait</th>
+						<th class="num">Duration</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, j := range jobs {
+						<tr>
+							<td>
+								@badge(jobTone(j.Status()), j.Status())
+							</td>
+							<td class="primary">
+								<a href={ templ.SafeURL("/jobs/" + strconv.FormatInt(j.RequestID, 10)) }>
+									if j.DisplayName != "" {
+										{ j.DisplayName }
+									} else {
+										Request { strconv.FormatInt(j.RequestID, 10) }
+									}
+								</a>
+								<span class="sub">{ j.Owner }/{ j.Repository } · { workflowFile(j.WorkflowRef) }</span>
+							</td>
+							<td>{ j.ScaleSet }</td>
+							<td>
+								if j.RunnerName != "" {
+									<a href={ templ.SafeURL("/runners/" + j.RunnerName) }>{ j.RunnerName }</a>
+								} else {
+									<span class="faint">—</span>
+								}
+							</td>
+							<td>
+								@timeAgo(j.QueuedAt)
+							</td>
+							<td class="num">{ duration(j.Wait()) }</td>
+							<td class="num">{ duration(j.Duration()) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		}
+	</div>
+}
+
+templ eventsList(events []store.Event) {
+	if len(events) == 0 {
+		<p class="empty">Nothing has happened yet.</p>
+	} else {
+		<ul class="events">
+			for _, e := range events {
+				<li class={ e.Level }>
+					<span class="faint">
+						@timeAgo(e.At)
+					</span>
+					<span class="muted">{ e.ScaleSet }</span>
+					<span class="msg">{ e.Message }</span>
+				</li>
+			}
+		</ul>
+	}
+}

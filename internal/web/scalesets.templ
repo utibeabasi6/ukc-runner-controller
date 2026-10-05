@@ -1,0 +1,111 @@
+package web
+
+import (
+	"strconv"
+
+	"unikraft.com/cloud/sdk/platform"
+	"unikraft.com/x/ptr"
+)
+
+templ scaleSetsPage(v scaleSetsView) {
+	<div class="page-title">
+		@eyebrow("", "Scale Sets") {
+			{ strconv.Itoa(len(v.ScaleSets)) } configured
+		}
+		<h1>Scale Sets</h1>
+		<div class="meta">
+			<span>{ v.GitHubURL }</span>
+			<span>metro { v.Metro }</span>
+		</div>
+	</div>
+	<section class="section">
+		@eyebrow("01", "Listeners") {
+		}
+		<div class="table-wrap">
+			<table>
+				<thead>
+					<tr>
+						<th>State</th>
+						<th>Scale set</th>
+						<th class="num">ID</th>
+						<th class="num">Runners</th>
+						<th class="num">Available</th>
+						<th class="num">Assigned</th>
+						<th class="num">Running</th>
+						<th class="num">Registered</th>
+						<th>Last poll</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, ss := range v.ScaleSets {
+						<tr>
+							<td>
+								@badge(listenerTone(ss.Status.State), ss.Status.State)
+							</td>
+							<td class="primary">
+								{ ss.Config.Name }
+								<span class="sub">{ shape(ss.Config.VCPUs, ss.Config.MemoryMB, ss.Config.DiskMB) }</span>
+							</td>
+							<td class="num">{ strconv.Itoa(ss.Status.ID) }</td>
+							<td class="num">{ strconv.Itoa(ss.Queued + ss.Idle + ss.Busy) } / { strconv.Itoa(ss.Config.MaxRunners) }</td>
+							<td class="num">{ strconv.Itoa(ss.Status.Statistics.TotalAvailableJobs) }</td>
+							<td class="num">{ strconv.Itoa(ss.Status.Statistics.TotalAssignedJobs) }</td>
+							<td class="num">{ strconv.Itoa(ss.Status.Statistics.TotalRunningJobs) }</td>
+							<td class="num">{ strconv.Itoa(ss.Status.Statistics.TotalRegisteredRunners) }</td>
+							<td>{ ago(ss.Status.LastPollAt) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	</section>
+	<section class="section">
+		@eyebrow("02", "Configuration") {
+		}
+		<div class="grid">
+			for _, ss := range v.ScaleSets {
+				@scaleSetCard(ss)
+			}
+		</div>
+	</section>
+	<section class="section">
+		@eyebrow("03", "Unikraft Cloud Quota") {
+			metro { v.Metro }
+		}
+		if v.Quota == nil {
+			<div class="card"><p class="empty">Quota not loaded yet.</p></div>
+		} else {
+			@quotaCard(v.Quota)
+		}
+	</section>
+}
+
+templ quotaCard(q *platform.Quotas) {
+	<div class="card">
+		<dl class="facts">
+			if q.Used != nil && q.Hard != nil {
+				@usage("Live vCPUs", ptr.ZeroIfNil(q.Used.LiveVcpus), ptr.ZeroIfNil(q.Hard.LiveVcpus), "")
+				@usage("Live memory", ptr.ZeroIfNil(q.Used.LiveMemoryMb), ptr.ZeroIfNil(q.Hard.LiveMemoryMb), " MiB")
+				@usage("Instances", ptr.ZeroIfNil(q.Used.Instances), ptr.ZeroIfNil(q.Hard.Instances), "")
+				@usage("Volumes", ptr.ZeroIfNil(q.Used.Volumes), ptr.ZeroIfNil(q.Hard.Volumes), "")
+				@usage("Volume space", ptr.ZeroIfNil(q.Used.TotalVolumeMb), ptr.ZeroIfNil(q.Hard.TotalVolumeMb), " MiB")
+			}
+			if l := q.Limits; l != nil {
+				<dt>vCPUs per instance</dt>
+				<dd>{ strconv.FormatInt(ptr.ZeroIfNil(l.MinVcpus), 10) } – { strconv.FormatInt(ptr.ZeroIfNil(l.MaxVcpus), 10) }</dd>
+				<dt>Memory per instance</dt>
+				<dd>{ strconv.FormatInt(ptr.ZeroIfNil(l.MinMemoryMb), 10) } – { strconv.FormatInt(ptr.ZeroIfNil(l.MaxMemoryMb), 10) } MiB</dd>
+				<dt>Volume size</dt>
+				<dd>{ strconv.FormatInt(ptr.ZeroIfNil(l.MinVolumeMb), 10) } – { strconv.FormatInt(ptr.ZeroIfNil(l.MaxVolumeMb), 10) } MiB</dd>
+			}
+		</dl>
+	</div>
+}
+
+templ usage(label string, used, hard int64, unit string) {
+	<dt>{ label }</dt>
+	<dd>
+		{ strconv.FormatInt(used, 10) } / { strconv.FormatInt(hard, 10) }{ unit }
+		<span class="muted">· { pct(used, hard) }</span>
+	</dd>
+}
