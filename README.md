@@ -84,6 +84,9 @@ unikraft login
 unikraft build ./image --output <your-org>/actions-runner:2.337.0
 ```
 
+Each Unikraft Cloud metro caches an image by its tag, and does not pull the tag again after you push a new build.
+Use a new tag for every build, for example `2.337.0-1`, `2.337.0-2`, and set the same tag in `image` in the config.
+
 The controller turns off automatic runner updates, because an update on every job start would make each job slower.
 Rebuild the image when GitHub releases a new runner version.
 Change `RUNNER_VERSION` and `RUNNER_SHA256` in [`image/Dockerfile`](image/Dockerfile).
