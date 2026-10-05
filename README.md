@@ -316,6 +316,9 @@ Make sure that the total fits your volume quota.
 
 - The runner image is for x86_64 only.
 - Jobs cannot use `container:` or `services:`, because the instance has no Docker daemon.
+- Jobs run as root inside their instance.
+  `unikraft build` makes root the owner of every file in the image, so the runner cannot run as another user.
+  Tools that refuse to run as root, such as `initdb`, need their own user.
 - Only one controller can listen to a scale set at a time.
 - The controller keeps the scale sets when it shuts down.
   To remove a runner spec, remove it from the config and delete its scale set in the GitHub runner settings.

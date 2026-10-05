@@ -26,11 +26,6 @@ RUN apt-get update \
       zip \
  && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd --gid 1001 runner \
- && useradd --uid 1001 --gid runner --create-home --shell /bin/bash runner \
- && echo "runner ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/runner \
- && chmod 0440 /etc/sudoers.d/runner
-
 WORKDIR /home/runner
 
 RUN curl -fsSL -o runner.tar.gz \
@@ -41,7 +36,6 @@ RUN curl -fsSL -o runner.tar.gz \
  && rm -rf externals/node20 externals/node20_alpine externals/node24_alpine \
  && ./bin/installdependencies.sh \
  && rm -rf /var/lib/apt/lists/* \
- && mkdir _work \
- && chown -R runner:runner /home/runner
+ && mkdir _work
 
 COPY --chmod=0755 entrypoint.sh /usr/local/bin/entrypoint.sh
