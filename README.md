@@ -4,28 +4,7 @@ ukc-runner-controller runs GitHub Actions jobs on [Unikraft Cloud](https://unikr
 Each job gets a fresh microVM with its own work disk.
 The microVM runs one job and is then deleted.
 
-The controller uses the GitHub runner scale set API, the same API that
-[Actions Runner Controller](https://github.com/actions/actions-runner-controller) uses.
-It does not need Kubernetes.
-It also serves a small dashboard that shows jobs, runners and scale sets.
-
-## How it works
-
-1. You define one or more runner specs in a config file.
-   Each spec becomes a runner scale set in GitHub and has a fixed vCPU, memory and disk size.
-2. The controller long-polls GitHub for jobs that target each scale set.
-3. When a job arrives, the controller asks GitHub for a just-in-time (JIT) runner config.
-4. The controller creates a Unikraft Cloud instance from the runner image.
-   The instance gets the JIT config in an environment variable and a new volume for the runner work folder.
-   If the Unikraft Cloud API rate-limits the request (HTTP 429), the controller queues the runner and retries in the background.
-   The retries back off from 10 seconds up to 5 minutes and obey the `Retry-After` header.
-5. The runner registers, runs exactly one job, and exits.
-   The instance stops.
-6. The controller saves the exit code and the end of the console log, and then deletes the instance and its volume.
-
-The controller keeps its state in a local SQLite database.
-If the controller restarts, running jobs continue.
-Instances that stop while the controller is down are deleted by the platform after 30 minutes.
+A small dashboard shows jobs, runners and scale sets.
 
 ## Requirements
 
@@ -73,8 +52,7 @@ Give the token to the controller in the `GITHUB_TOKEN` environment variable and 
 ### 2. Build and push the runner image
 
 The runner image is in [`image/`](image).
-It is a Debian 13 root filesystem with the GitHub Actions runner, git, curl, jq and sudo.
-It runs on the `base-compat` runtime of Unikraft Cloud.
+It contains the GitHub Actions runner, git, a C and C++ toolchain, and common command-line tools.
 
 ```bash
 unikraft login
@@ -84,10 +62,9 @@ unikraft login
 unikraft build ./image --output <your-org>/actions-runner:2.337.0
 ```
 
-Each Unikraft Cloud metro caches an image by its tag, and does not pull the tag again after you push a new build.
 Use a new tag for every build, for example `2.337.0-1`, `2.337.0-2`, and set the same tag in `image` in the config.
 
-The controller turns off automatic runner updates, because an update on every job start would make each job slower.
+The runner does not update itself.
 Rebuild the image when GitHub releases a new runner version.
 Change `RUNNER_VERSION` and `RUNNER_SHA256` in [`image/Dockerfile`](image/Dockerfile).
 The SHA-256 sum is in the release notes of [actions/runner](https://github.com/actions/runner/releases).
@@ -320,7 +297,6 @@ Make sure that the total fits your volume quota.
 - The runner image is for x86_64 only.
 - Jobs cannot use `container:` or `services:`, because the instance has no Docker daemon.
 - Jobs run as root inside their instance.
-  `unikraft build` makes root the owner of every file in the image, so the runner cannot run as another user.
   Tools that refuse to run as root, such as `initdb`, need their own user.
 - Only one controller can listen to a scale set at a time.
 - The controller keeps the scale sets when it shuts down.
@@ -338,7 +314,6 @@ make lint
 
 The pages use [templ](https://templ.guide).
 After you change a `.templ` file, run `make generate` and commit the generated `_templ.go` files.
-The dashboard styles come from the Unikraft Design System tokens in [`internal/web/static/css/tokens.css`](internal/web/static/css/tokens.css).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request.
 

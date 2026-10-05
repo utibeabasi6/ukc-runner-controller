@@ -8,10 +8,12 @@ templ layout(title, nav, version string, content templ.Component) {
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
-			<meta name="theme-color" content="#fcfcfd"/>
+			<meta name="color-scheme" content="dark light"/>
+			<meta name="theme-color" content="#0b0f17"/>
 			<title>{ title } · ukc-runner-controller</title>
 			<link rel="stylesheet" href={ asset("css/tokens.css") }/>
 			<link rel="stylesheet" href={ asset("css/app.css") }/>
+			<script src={ asset("js/theme.js") }></script>
 			<script src={ asset("js/refresh.js") } defer></script>
 		</head>
 		<body>
@@ -24,6 +26,10 @@ templ layout(title, nav, version string, content templ.Component) {
 						@navLink("/runners", "Runners", nav == navRunners)
 						@navLink("/scale-sets", "Scale Sets", nav == navScaleSets)
 					</nav>
+					<button class="theme-toggle" type="button" aria-label="Switch colour theme" data-theme-toggle>
+						<span class="theme-light-label">Light</span>
+						<span class="theme-dark-label">Dark</span>
+					</button>
 				</div>
 			</header>
 			<main class="container" data-refresh="5000">

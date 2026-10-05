@@ -76,10 +76,10 @@ templ jobPage(v jobView) {
 		</div>
 	</div>
 	<div class="split">
-		<section class="card">
+		<section>
 			@eyebrow("", "Details") {
 			}
-			<dl class="facts">
+			<dl class="facts card">
 				<dt>Scale set</dt>
 				<dd>{ v.Job.ScaleSet }</dd>
 				<dt>Runner</dt>
@@ -104,10 +104,10 @@ templ jobPage(v jobView) {
 				</dd>
 			</dl>
 		</section>
-		<section class="card">
+		<section>
 			@eyebrow("", "Timeline") {
 			}
-			<dl class="facts">
+			<dl class="facts card">
 				<dt>Queued</dt>
 				<dd>{ clock(v.Job.QueuedAt) }</dd>
 				@timelineStep("Assigned", v.Job.QueuedAt, v.Job.AssignedAt)
