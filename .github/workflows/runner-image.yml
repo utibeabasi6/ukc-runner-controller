@@ -1,0 +1,30 @@
+name: Runner image
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Image tag
+        default: "2.337.0"
+
+permissions:
+  contents: read
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    env:
+      UKC_ORG: ${{ vars.UKC_ORG }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install the unikraft CLI
+        run: |
+          curl --proto '=https' --tlsv1.2 -fsSL https://unikraft.com/cli/install.sh | sh -s -- --bin-dir "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Log in to Unikraft Cloud
+        env:
+          UKC_TOKEN: ${{ secrets.UKC_TOKEN }}
+        run: printf '%s' "$UKC_TOKEN" | unikraft login --token - --organization "$UKC_ORG"
+      - name: Build and push
+        run: unikraft build ./image --output "$UKC_ORG/actions-runner:$TAG"
