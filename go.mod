@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/a-h/templ v0.3.1070
 	github.com/actions/scaleset v0.4.1-0.20260916214619-e6daac702355
-	github.com/alecthomas/kong v1.15.0
+	github.com/alecthomas/kong v1.16.1
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/sync v0.23.0
 	modernc.org/sqlite v1.60.1
