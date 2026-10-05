@@ -32,7 +32,7 @@ Instances that stop while the controller is down are deleted by the platform aft
 - A Unikraft Cloud account and an API token.
   Make sure that your quota allows the vCPU, memory and volume sizes that you plan to use.
 - A GitHub organization, repository or enterprise where you can register self-hosted runners.
-- The [`unikraft` CLI](https://unikraft.com/docs/cli/overview) to build the runner image.
+- The [`unikraft` CLI](https://unikraft.com/docs/cli/overview/) to build the runner image.
 - A machine to run the controller.
   It needs outbound HTTPS access to GitHub and to Unikraft Cloud.
   It does not need inbound access, except for the dashboard.
