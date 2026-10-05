@@ -151,6 +151,14 @@ func newFakeUKC(t *testing.T) *fakeUKC {
 	mux.HandleFunc("POST /v1/instances", func(w http.ResponseWriter, r *http.Request) {
 		var req platform.CreateInstanceRequest
 		json.NewDecoder(r.Body).Decode(&req)
+		for _, v := range req.Volumes {
+			if (v.Name != nil || v.Uuid != nil) && v.SizeMb != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				io.WriteString(w, `{"status":"error","message":"Either a reference to an existing volume or the description of a new volume can be provided"}`)
+				return
+			}
+		}
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		if f.rateLimited > 0 {

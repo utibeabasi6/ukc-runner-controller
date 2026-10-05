@@ -1,10 +1,12 @@
 #!/bin/sh
 set -eu
 
-# The instance starts this script as root with the work volume owned by root.
-# Jobs run as an unprivileged user with sudo, as on GitHub-hosted runners.
+# The instance starts this script as root. unikraft build makes root the owner
+# of every file in the rootfs, and the work volume is owned by root too. Jobs
+# run as an unprivileged user with sudo, as on GitHub-hosted runners, and the
+# runner writes its config and logs into its install directory.
 # ACTIONS_RUNNER_INPUT_JITCONFIG passes through in the environment.
-chown runner:runner /home/runner/_work
+chown runner:runner /home/runner /home/runner/_work
 
 # The image only ships Node.js 24, so run Node.js 20 actions and the runner's
 # own scripts on it.

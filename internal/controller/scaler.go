@@ -248,7 +248,6 @@ func (s *scaler) startRunner(ctx context.Context) error {
 		Autokill:      &platform.CreateInstanceRequestAutokill{TimeMs: new(uint64(autokillAfter.Milliseconds()))},
 		Tags:          []string{instanceTag, "scale-set=" + s.rc.Name},
 		Volumes: []platform.CreateInstanceRequestVolume{{
-			Name:   new(name + "-work"),
 			At:     runnerWorkDir,
 			SizeMb: new(uint64(s.rc.DiskMB)),
 		}},
