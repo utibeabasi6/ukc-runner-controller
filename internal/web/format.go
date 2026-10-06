@@ -2,9 +2,12 @@ package web
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/a-h/templ"
 
 	"github.com/utibeabasi6/ukc-runner-controller/internal/controller"
 	"github.com/utibeabasi6/ukc-runner-controller/internal/store"
@@ -112,4 +115,15 @@ func pct(used, total int64) string {
 		return "—"
 	}
 	return fmt.Sprintf("%d%%", used*100/total)
+}
+
+func jobName(j store.Job) string {
+	if j.DisplayName != "" {
+		return j.DisplayName
+	}
+	return "Job " + j.JobID[:min(8, len(j.JobID))]
+}
+
+func jobURL(j store.Job) templ.SafeURL {
+	return templ.SafeURL("/jobs/" + url.PathEscape(j.JobID))
 }

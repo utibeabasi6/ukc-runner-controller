@@ -128,6 +128,8 @@ type fakeUKC struct {
 	created   []platform.CreateInstanceRequest
 	// rateLimited is the number of create requests to reject with a 429.
 	rateLimited int
+	// quotaFull is the number of create requests to reject as over quota.
+	quotaFull int
 	// unlisted instances exist but are left out of the full list, as they
 	// would be on a later page.
 	unlisted map[string]bool
@@ -161,6 +163,13 @@ func newFakeUKC(t *testing.T) *fakeUKC {
 		}
 		f.mu.Lock()
 		defer f.mu.Unlock()
+		if f.quotaFull > 0 {
+			f.quotaFull--
+			reply(w, map[string]any{"instances": []any{map[string]any{
+				"status": "error", "error": platform.APIHTTPErrorQuota, "message": "Failed to configure volume. Quota exceeded.",
+			}}})
+			return
+		}
 		if f.rateLimited > 0 {
 			f.rateLimited--
 			w.Header().Set("Retry-After", "120")
@@ -288,7 +297,7 @@ func TestControllerRunsOneInstancePerJob(t *testing.T) {
 	})
 
 	job := func(typ string, id int64, runner string) map[string]any {
-		return map[string]any{"messageType": typ, "runnerRequestId": id, "repositoryName": "app", "ownerName": "acme", "runnerName": runner, "result": "succeeded"}
+		return map[string]any{"messageType": typ, "runnerRequestId": id, "jobId": fmt.Sprintf("job-%d", id), "repositoryName": "app", "ownerName": "acme", "runnerName": runner, "result": "succeeded"}
 	}
 
 	gh.send(1, 3, job("JobAvailable", 11, ""), job("JobAvailable", 12, ""), job("JobAvailable", 13, ""))
@@ -341,7 +350,7 @@ func TestControllerRunsOneInstancePerJob(t *testing.T) {
 		t.Error("log tail was not recorded")
 	}
 
-	j, err := st.Job(ctx, 11)
+	j, err := st.Job(ctx, "job-11")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -367,7 +376,7 @@ func TestReconcileFailsRunnerWhoseInstanceStopsWhileIdle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ukc.instances["small-crash"] = map[string]any{"uuid": "uuid-crash", "name": "small-crash", "state": "stopped", "exit_code": 1}
+	ukc.instances["small-crash"] = map[string]any{"uuid": "uuid-crash", "name": "small-crash", "state": "stopped", "exit_code": 0}
 
 	if err := c.reconcile(ctx); err != nil {
 		t.Fatal(err)
@@ -575,5 +584,67 @@ func TestReconcileRetriesFailedDelete(t *testing.T) {
 	}
 	if r, _ := st.Runner(ctx, "small-stuck"); r.InstanceDeletedAt == nil {
 		t.Error("instance not recorded as deleted after a successful retry")
+	}
+}
+
+func TestQuotaFullRunnerIsQueuedAndRetried(t *testing.T) {
+	gh := newFakeGitHub(t)
+	ukc := newFakeUKC(t)
+	c, st := newTestController(t, gh, ukc)
+	ctx := t.Context()
+	s := &scaler{c: c, rc: smallRunner, id: 1, log: c.log}
+
+	ukc.quotaFull = 1
+	if err := s.startRunner(ctx); err != nil {
+		t.Fatal(err)
+	}
+	queued, err := st.Runners(ctx, store.RunnerFilter{States: []store.RunnerState{store.RunnerQueued}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(queued) != 1 {
+		t.Fatalf("queued runners = %+v, want one", queued)
+	}
+	if len(gh.removed) != 0 {
+		t.Errorf("removed GitHub runners = %v, want none while queued", gh.removed)
+	}
+
+	c.retries.notBefore = time.Time{}
+	c.retryQueued(ctx)
+	r, err := st.Runner(ctx, queued[0].Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.State != store.RunnerIdle || r.InstanceUUID == "" {
+		t.Errorf("runner after retry = %+v, want idle with an instance", r)
+	}
+}
+
+func TestReconcileFinishesIdleRunnerThatRecordedAJob(t *testing.T) {
+	gh := newFakeGitHub(t)
+	ukc := newFakeUKC(t)
+	c, st := newTestController(t, gh, ukc)
+	ctx := t.Context()
+
+	if err := st.CreateRunner(ctx, store.Runner{Name: "small-quick", ScaleSet: "small", GitHubRunnerID: 5, Image: "img", State: store.RunnerIdle, CreatedAt: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.RecordJob(ctx, store.Job{JobID: "job-1", ScaleSet: "small", RunnerName: "small-quick", QueuedAt: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	ukc.instances["small-quick"] = map[string]any{"uuid": "uuid-quick", "name": "small-quick", "state": "stopped", "exit_code": 0}
+
+	if err := c.reconcile(ctx); err != nil {
+		t.Fatal(err)
+	}
+	r, err := st.Runner(ctx, "small-quick")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.State != store.RunnerFinished {
+		t.Errorf("state = %s, want finished", r.State)
+	}
+	if len(gh.removed) != 0 {
+		t.Errorf("removed GitHub runners = %v, want none", gh.removed)
 	}
 }

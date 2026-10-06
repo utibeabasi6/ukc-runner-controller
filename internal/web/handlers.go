@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"unikraft.com/cloud/sdk/platform"
@@ -163,12 +162,7 @@ func (s *Server) jobs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) job(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-	if err != nil {
-		s.notFound(w, r)
-		return
-	}
-	j, err := s.store.Job(r.Context(), id)
+	j, err := s.store.Job(r.Context(), r.PathValue("id"))
 	if errors.Is(err, store.ErrNotFound) {
 		s.notFound(w, r)
 		return
@@ -181,7 +175,7 @@ func (s *Server) job(w http.ResponseWriter, r *http.Request) {
 	if u, err := url.Parse(s.ctrl.Config().GitHub.URL); err == nil && j.WorkflowRunID != 0 && j.Repository != "" {
 		v.RunURL = fmt.Sprintf("%s://%s/%s/%s/actions/runs/%d", u.Scheme, u.Host, j.Owner, j.Repository, j.WorkflowRunID)
 	}
-	s.render(w, r, http.StatusOK, "Job "+strconv.FormatInt(id, 10), navJobs, jobPage(v))
+	s.render(w, r, http.StatusOK, jobName(j), navJobs, jobPage(v))
 }
 
 func (s *Server) runners(w http.ResponseWriter, r *http.Request) {

@@ -33,8 +33,8 @@ func newTestServer(t *testing.T, username, password string) http.Handler {
 		st.CreateRunner(ctx, store.Runner{Name: "small-def", ScaleSet: "small", Image: "acme/runner:1", VCPUs: 1, MemoryMB: 2048, DiskMB: 10240, State: store.RunnerIdle, CreatedAt: now}),
 		st.FinishRunner(ctx, "small-def", store.RunnerFailed, "instance stopped before the runner took a job", now),
 		st.RecordInstanceExit(ctx, "small-def", store.InstanceExit{ExitCode: &exit, LogTail: "Listening for Jobs\n<script>alert(1)</script>", DeletedAt: now}),
-		st.RecordJob(ctx, store.Job{RequestID: 7, ScaleSet: "small", Owner: "acme", Repository: "app", WorkflowRef: "acme/app/.github/workflows/ci.yml@refs/heads/main", DisplayName: "build", WorkflowRunID: 99, QueuedAt: now.Add(-2 * time.Minute)}),
-		st.RecordJob(ctx, store.Job{RequestID: 7, RunnerName: "small-abc", Result: "failed", StartedAt: &started, CompletedAt: &completed}),
+		st.RecordJob(ctx, store.Job{JobID: "job-7", ScaleSet: "small", Owner: "acme", Repository: "app", WorkflowRef: "acme/app/.github/workflows/ci.yml@refs/heads/main", DisplayName: "build", WorkflowRunID: 99, QueuedAt: now.Add(-2 * time.Minute)}),
+		st.RecordJob(ctx, store.Job{JobID: "job-7", RunnerName: "small-abc", Result: "failed", StartedAt: &started, CompletedAt: &completed}),
 		st.AddEvent(ctx, store.Event{ScaleSet: "small", Level: store.LevelError, Message: "listener stopped"}),
 	}
 	for _, err := range seed {
@@ -72,8 +72,8 @@ func TestPagesRender(t *testing.T) {
 		{"/jobs", http.StatusOK, "build"},
 		{"/jobs?status=failed&scale_set=small", http.StatusOK, "acme/app"},
 		{"/jobs?status=running", http.StatusOK, "No jobs match"},
-		{"/jobs/7", http.StatusOK, "https://github.com/acme/app/actions/runs/99"},
-		{"/jobs/8", http.StatusNotFound, "does not exist"},
+		{"/jobs/job-7", http.StatusOK, "https://github.com/acme/app/actions/runs/99"},
+		{"/jobs/job-8", http.StatusNotFound, "does not exist"},
 		{"/jobs/abc", http.StatusNotFound, "does not exist"},
 		{"/runners", http.StatusOK, "small-abc"},
 		{"/runners/small-def", http.StatusOK, "&lt;script&gt;"},

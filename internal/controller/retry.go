@@ -21,12 +21,16 @@ const (
 	maxRetryDelay = 5 * time.Minute
 )
 
-type rateLimitError struct {
+// retryLaterError marks a create request that the API rejected for now: it
+// hit the rate limit, or the account quota is full until a finished runner's
+// instance and volume are deleted.
+type retryLaterError struct {
+	reason     string
 	retryAfter time.Duration
 }
 
-func (e *rateLimitError) Error() string {
-	return "rate limited by the Unikraft Cloud API"
+func (e *retryLaterError) Error() string {
+	return e.reason
 }
 
 type rateLimitTransport struct {
@@ -40,7 +44,10 @@ func (t rateLimitTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 	resp.Body.Close()
 	secs, _ := strconv.Atoi(resp.Header.Get("Retry-After"))
-	return nil, &rateLimitError{retryAfter: time.Duration(secs) * time.Second}
+	return nil, &retryLaterError{
+		reason:     "rate limited by the Unikraft Cloud API",
+		retryAfter: time.Duration(secs) * time.Second,
+	}
 }
 
 // NewUKCHTTPClient returns the HTTP client to pass to the Unikraft Cloud SDK.
@@ -60,9 +67,9 @@ type pendingInstance struct {
 	req      platform.CreateInstanceRequest
 }
 
-// retryQueue holds instance creations that the API rejected with a 429. The
-// rate limit applies to the whole account, so the queue backs off as a whole
-// and retries the oldest entry first. Entries keep the runner's JIT config,
+// retryQueue holds instance creations that failed with a retryLaterError. Rate
+// limits and quotas apply to the whole account, so the queue backs off as a
+// whole and retries the oldest entry first. Entries keep the runner's JIT config,
 // which is a credential, so they only ever live in memory.
 type retryQueue struct {
 	mu        sync.Mutex
@@ -115,7 +122,8 @@ func (c *Controller) retryLoop(ctx context.Context) {
 	}
 }
 
-// retryQueued works through the queue in order and stops at the first 429.
+// retryQueued works through the queue in order and stops at the first entry
+// that has to wait again.
 // An entry stays in the queue while its request is in flight, so reconcile
 // does not mistake its runner for one whose instance was lost.
 func (c *Controller) retryQueued(ctx context.Context) {
@@ -134,12 +142,12 @@ func (c *Controller) retryQueued(ctx context.Context) {
 			return
 		}
 
-		var rl *rateLimitError
-		if errors.As(err, &rl) {
+		var later *retryLaterError
+		if errors.As(err, &later) {
 			c.retries.mu.Lock()
-			c.retries.backoff(rl.retryAfter)
+			c.retries.backoff(later.retryAfter)
 			c.retries.mu.Unlock()
-			c.log.Warn("still rate limited, retrying queued runners later")
+			c.log.Warn("cannot start queued runners yet", "reason", later)
 			return
 		}
 		if !c.retries.remove(name) {

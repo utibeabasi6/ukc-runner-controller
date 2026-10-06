@@ -182,8 +182,14 @@ func (c *Controller) collect(ctx context.Context, r store.Runner, inst *platform
 		case inst == nil:
 			reason = "instance disappeared"
 		}
+		// The runner's run.sh exits 0 on most failures, so the exit code does
+		// not tell whether it ran a job. A recorded job does.
+		jobs, err := c.store.Jobs(ctx, store.JobFilter{RunnerName: r.Name, Limit: 1})
+		if err != nil {
+			return err
+		}
 		state := store.RunnerFailed
-		if r.State == store.RunnerBusy || (exit.ExitCode != nil && *exit.ExitCode == 0) {
+		if r.State == store.RunnerBusy || len(jobs) > 0 {
 			state, reason = store.RunnerFinished, ""
 		} else {
 			c.removeRunner(ctx, r.GitHubRunnerID)

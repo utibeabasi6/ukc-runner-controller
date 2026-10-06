@@ -54,16 +54,10 @@ func jobsURL(scaleSet, status string) string {
 
 templ jobPage(v jobView) {
 	<div class="page-title">
-		@eyebrow("", "Job "+strconv.FormatInt(v.Job.RequestID, 10)) {
+		@eyebrow("", "Job") {
 			@badge(jobTone(v.Job.Status()), v.Job.Status())
 		}
-		<h1>
-			if v.Job.DisplayName != "" {
-				{ v.Job.DisplayName }
-			} else {
-				Request { strconv.FormatInt(v.Job.RequestID, 10) }
-			}
-		</h1>
+		<h1>{ jobName(v.Job) }</h1>
 		<div class="meta">
 			<span>{ v.Job.Owner }/{ v.Job.Repository }</span>
 			<span>{ workflowFile(v.Job.WorkflowRef) }</span>

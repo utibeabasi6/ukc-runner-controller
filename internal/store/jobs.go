@@ -10,9 +10,9 @@ import (
 )
 
 type Job struct {
+	JobID         string
 	RequestID     int64
 	ScaleSet      string
-	JobID         string
 	Owner         string
 	Repository    string
 	WorkflowRef   string
@@ -75,12 +75,12 @@ type Summary struct {
 	MedianDuration time.Duration
 }
 
-const jobColumns = `request_id, scale_set, job_id, owner, repository, workflow_ref, display_name,
+const jobColumns = `job_id, request_id, scale_set, owner, repository, workflow_ref, display_name,
 	event_name, workflow_run_id, runner_name, result, queued_at, assigned_at, started_at, completed_at`
 
 func scanJob(row interface{ Scan(...any) error }) (Job, error) {
 	var j Job
-	err := row.Scan(&j.RequestID, &j.ScaleSet, &j.JobID, &j.Owner, &j.Repository, &j.WorkflowRef, &j.DisplayName,
+	err := row.Scan(&j.JobID, &j.RequestID, &j.ScaleSet, &j.Owner, &j.Repository, &j.WorkflowRef, &j.DisplayName,
 		&j.EventName, &j.WorkflowRunID, &j.RunnerName, &j.Result, &j.QueuedAt, &j.AssignedAt, &j.StartedAt, &j.CompletedAt)
 	return j, err
 }
@@ -95,21 +95,21 @@ func (s *Store) RecordJob(ctx context.Context, j Job) error {
 	_, err := s.rw.ExecContext(ctx, `
 		INSERT INTO jobs (`+jobColumns+`)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT (request_id) DO UPDATE SET
-			job_id       = coalesce(nullif(excluded.job_id, ''), jobs.job_id),
+		ON CONFLICT (job_id) DO UPDATE SET
+			request_id   = coalesce(nullif(excluded.request_id, 0), jobs.request_id),
 			runner_name  = coalesce(nullif(excluded.runner_name, ''), jobs.runner_name),
 			result       = coalesce(nullif(excluded.result, ''), jobs.result),
 			assigned_at  = coalesce(jobs.assigned_at, excluded.assigned_at),
 			started_at   = coalesce(jobs.started_at, excluded.started_at),
 			completed_at = coalesce(jobs.completed_at, excluded.completed_at)`,
-		j.RequestID, j.ScaleSet, j.JobID, j.Owner, j.Repository, j.WorkflowRef, j.DisplayName,
+		j.JobID, j.RequestID, j.ScaleSet, j.Owner, j.Repository, j.WorkflowRef, j.DisplayName,
 		j.EventName, j.WorkflowRunID, j.RunnerName, strings.ToLower(j.Result),
 		j.QueuedAt.UTC(), utc(j.AssignedAt), utc(j.StartedAt), utc(j.CompletedAt))
 	return err
 }
 
-func (s *Store) Job(ctx context.Context, requestID int64) (Job, error) {
-	j, err := scanJob(s.ro.QueryRowContext(ctx, `SELECT `+jobColumns+` FROM jobs WHERE request_id = ?`, requestID))
+func (s *Store) Job(ctx context.Context, jobID string) (Job, error) {
+	j, err := scanJob(s.ro.QueryRowContext(ctx, `SELECT `+jobColumns+` FROM jobs WHERE job_id = ?`, jobID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return j, ErrNotFound
 	}

@@ -113,13 +113,7 @@ templ jobsTable(jobs []store.Job, empty string) {
 								@badge(jobTone(j.Status()), j.Status())
 							</td>
 							<td class="primary">
-								<a href={ templ.SafeURL("/jobs/" + strconv.FormatInt(j.RequestID, 10)) }>
-									if j.DisplayName != "" {
-										{ j.DisplayName }
-									} else {
-										Request { strconv.FormatInt(j.RequestID, 10) }
-									}
-								</a>
+								<a href={ jobURL(j) }>{ jobName(j) }</a>
 								<span class="sub">{ j.Owner }/{ j.Repository } · { workflowFile(j.WorkflowRef) }</span>
 							</td>
 							<td>{ j.ScaleSet }</td>

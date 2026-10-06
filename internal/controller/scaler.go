@@ -109,8 +109,12 @@ func (s *scaler) handle(ctx context.Context, msg *scaleset.RunnerScaleSetMessage
 		jobs = append(jobs, j)
 	}
 	for _, j := range jobs {
+		if j.JobID == "" {
+			s.log.Debug("skipping job message without a job ID", "request_id", j.RequestID)
+			continue
+		}
 		if err := s.c.store.RecordJob(ctx, j); err != nil {
-			return fmt.Errorf("recording job %d: %w", j.RequestID, err)
+			return fmt.Errorf("recording job %s: %w", j.JobID, err)
 		}
 	}
 
@@ -254,14 +258,14 @@ func (s *scaler) startRunner(ctx context.Context) error {
 	}
 
 	uuid, err := s.c.createInstance(ctx, req)
-	var rl *rateLimitError
-	if errors.As(err, &rl) {
+	var later *retryLaterError
+	if errors.As(err, &later) {
 		if err := s.c.store.QueueRunner(ctx, name); err != nil {
 			s.c.removeRunner(ctx, jit.Runner.ID)
 			return fmt.Errorf("queueing runner %s: %w", name, err)
 		}
-		s.c.retries.push(pendingInstance{scaleSet: s.rc.Name, runnerID: jit.Runner.ID, req: req}, rl.retryAfter)
-		s.log.Warn("rate limited, queued runner for retry", "runner", name)
+		s.c.retries.push(pendingInstance{scaleSet: s.rc.Name, runnerID: jit.Runner.ID, req: req}, later.retryAfter)
+		s.log.Warn("queued runner for retry", "runner", name, "reason", later)
 		return nil
 	}
 	if err != nil {
@@ -282,14 +286,23 @@ func (s *scaler) startRunner(ctx context.Context) error {
 func (c *Controller) createInstance(ctx context.Context, req platform.CreateInstanceRequest) (string, error) {
 	resp, err := c.ukc.CreateInstance(ctx, req)
 	switch {
+	case platform.ErrorContains(err, platform.APIHTTPErrorQuota):
+		return "", &retryLaterError{reason: err.Error()}
 	case err != nil:
 		return "", err
 	case resp.Data == nil || len(resp.Data.Instances) == 0:
 		return "", errors.New("no instance in response")
-	case ptr.ZeroIfNil(resp.Data.Instances[0].Status) == platform.ResponseStatusERROR:
-		return "", errors.New(ptr.ZeroIfNil(resp.Data.Instances[0].Message))
 	}
-	return ptr.ZeroIfNil(resp.Data.Instances[0].Uuid), nil
+
+	inst := resp.Data.Instances[0]
+	if ptr.ZeroIfNil(inst.Status) == platform.ResponseStatusERROR {
+		msg := ptr.ZeroIfNil(inst.Message)
+		if ptr.ZeroIfNil(inst.Error) == int32(platform.APIHTTPErrorQuota) {
+			return "", &retryLaterError{reason: msg}
+		}
+		return "", errors.New(msg)
+	}
+	return ptr.ZeroIfNil(inst.Uuid), nil
 }
 
 func (c *Controller) removeRunner(ctx context.Context, id int) {

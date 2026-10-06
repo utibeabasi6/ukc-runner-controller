@@ -37,9 +37,9 @@ func TestRecordJobMergesMessages(t *testing.T) {
 	completed := started.Add(time.Minute)
 
 	steps := []Job{
-		{RequestID: 7, ScaleSet: "small", Repository: "repo", QueuedAt: queued},
-		{RequestID: 7, ScaleSet: "small", Result: "Succeeded", CompletedAt: &completed, RunnerName: "small-1"},
-		{RequestID: 7, ScaleSet: "small", StartedAt: &started, RunnerName: "small-1"},
+		{JobID: "job-7", ScaleSet: "small", Repository: "repo", QueuedAt: queued},
+		{JobID: "job-7", ScaleSet: "small", Result: "Succeeded", CompletedAt: &completed, RunnerName: "small-1"},
+		{JobID: "job-7", ScaleSet: "small", StartedAt: &started, RunnerName: "small-1"},
 	}
 	for _, j := range steps {
 		if err := s.RecordJob(ctx, j); err != nil {
@@ -47,7 +47,7 @@ func TestRecordJobMergesMessages(t *testing.T) {
 		}
 	}
 
-	got, err := s.Job(ctx, 7)
+	got, err := s.Job(ctx, "job-7")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,12 +163,12 @@ func TestRecordJobKeepsFirstTimestamp(t *testing.T) {
 	first := time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
 	redelivered := first.Add(time.Minute)
 	for _, at := range []time.Time{first, redelivered} {
-		if err := s.RecordJob(ctx, Job{RequestID: 1, ScaleSet: "small", QueuedAt: first, StartedAt: &at}); err != nil {
+		if err := s.RecordJob(ctx, Job{JobID: "job-1", ScaleSet: "small", QueuedAt: first, StartedAt: &at}); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	j, err := s.Job(ctx, 1)
+	j, err := s.Job(ctx, "job-1")
 	if err != nil {
 		t.Fatal(err)
 	}
